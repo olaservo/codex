@@ -119,16 +119,30 @@ Codex does **not** support MCP prompts as a client:
 
 The `RmcpClient` wrapper does not expose prompt methods. This is a gap in Codex's MCP client implementation.
 
-### 6. Server-to-Client Notifications (IMPLEMENTED)
+### 6. Server-to-Client Notifications (PARTIAL)
 
-Codex handles these server notifications:
-- `notifications/cancelled` - Request cancellation
-- `notifications/progress` - Progress updates
-- `notifications/resources/updated` - Resource changes
-- `notifications/resources/list_changed` - Resource list changes
-- `notifications/tools/list_changed` - Tool list changes
-- `notifications/prompts/list_changed` - Prompt list changes
-- `logging` - Log messages from server
+Codex receives notifications but **does not act on most of them**:
+
+| Notification | Received | Action Taken |
+|--------------|----------|--------------|
+| `notifications/cancelled` | ✅ | ✅ Logged |
+| `notifications/progress` | ✅ | ✅ Logged |
+| `notifications/resources/updated` | ✅ | ⚠️ **Logged only** - no refresh |
+| `notifications/resources/list_changed` | ✅ | ⚠️ **Logged only** - no refresh |
+| `notifications/tools/list_changed` | ✅ | ⚠️ **Logged only** - no refresh |
+| `notifications/prompts/list_changed` | ✅ | ⚠️ **Logged only** - no refresh |
+| `logging` | ✅ | ✅ Logged at appropriate level |
+
+**Gap:** When a server notifies that tools/resources have changed, Codex does not re-fetch the updated lists. Dynamic tool discovery is not supported - changes require connection restart.
+
+### 7. Resource Subscriptions (NOT IMPLEMENTED)
+
+| Method | Status |
+|--------|--------|
+| `resources/subscribe` | ❌ Not implemented |
+| `resources/unsubscribe` | ❌ Not implemented |
+
+Codex cannot subscribe to resource updates from MCP servers.
 
 ## Client Info
 
