@@ -16,6 +16,8 @@ use codex_core::config::types::McpServerConfig;
 use codex_core::config::types::McpServerTransportConfig;
 use codex_core::mcp::auth::compute_auth_statuses;
 use codex_core::protocol::McpAuthStatus;
+use codex_rmcp_client::ElicitationAction;
+use codex_rmcp_client::ElicitationResponse;
 use codex_rmcp_client::OAuthCredentialsStoreMode;
 use codex_rmcp_client::RmcpClient;
 use codex_rmcp_client::delete_oauth_tokens;
@@ -891,10 +893,30 @@ async fn run_conformance(args: ConformanceArgs) -> Result<()> {
         protocol_version: mcp_types::MCP_SCHEMA_VERSION.to_owned(),
     };
 
-    // Create a dummy elicitation handler (we don't support interactive elicitation in tests)
-    let send_elicitation: codex_rmcp_client::SendElicitation = Box::new(|_id, _request| {
-        Box::pin(async {
-            Err(anyhow!("Elicitation not supported in conformance test mode"))
+    // Create an elicitation handler that auto-accepts with defaults from schema
+    // This is needed for elicitation conformance tests (SEP-1034)
+    let send_elicitation: codex_rmcp_client::SendElicitation = Box::new(|_id, request| {
+        Box::pin(async move {
+            eprintln!("ELICITATION: Received request: {}", request.message);
+
+            // Extract defaults from the schema properties
+            let mut content = serde_json::Map::new();
+            for (name, prop) in &request.requested_schema.properties {
+                // Try to extract the default value from the property
+                // The PrimitiveSchema types have a `default` field
+                let prop_json = serde_json::to_value(prop).unwrap_or_default();
+                if let Some(default_value) = prop_json.get("default") {
+                    content.insert(name.clone(), default_value.clone());
+                    eprintln!("ELICITATION: Applied default for '{name}': {default_value}");
+                }
+            }
+
+            eprintln!("ELICITATION: Accepting with {} default values", content.len());
+
+            Ok(ElicitationResponse {
+                action: ElicitationAction::Accept,
+                content: Some(serde_json::Value::Object(content)),
+            })
         })
     });
 
@@ -932,7 +954,7 @@ async fn run_conformance(args: ConformanceArgs) -> Result<()> {
     }
     println!();
 
-    // Call add_numbers tool if available (for conformance test compatibility)
+    // Call add_numbers tool if available (for tools_call conformance test)
     if let Some(tool) = tools_result.tools.iter().find(|t| t.name == "add_numbers") {
         println!("Calling tool: {} ...", tool.name);
         let arguments = serde_json::json!({"a": 5, "b": 3});
@@ -945,6 +967,29 @@ async fn run_conformance(args: ConformanceArgs) -> Result<()> {
             .await
         {
             Ok(result) => {
+                println!("  Result: {:?}", result);
+            }
+            Err(e) => {
+                println!("  Error: {e}");
+            }
+        }
+        println!();
+    }
+
+    // Call test_client_elicitation_defaults tool if available (for elicitation conformance test)
+    if let Some(tool) = tools_result.tools.iter().find(|t| t.name == "test_client_elicitation_defaults") {
+        println!("Calling tool: {} ...", tool.name);
+        println!("  (This tool triggers an elicitation request from the server)");
+        match client
+            .call_tool(
+                "test_client_elicitation_defaults".to_string(),
+                Some(serde_json::json!({})),
+                Some(timeout_duration),
+            )
+            .await
+        {
+            Ok(result) => {
+                println!("  Tool completed successfully");
                 println!("  Result: {:?}", result);
             }
             Err(e) => {
