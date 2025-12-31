@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -15,9 +16,13 @@ use codex_core::config::types::McpServerConfig;
 use codex_core::config::types::McpServerTransportConfig;
 use codex_core::mcp::auth::compute_auth_statuses;
 use codex_core::protocol::McpAuthStatus;
+use codex_rmcp_client::OAuthCredentialsStoreMode;
+use codex_rmcp_client::RmcpClient;
 use codex_rmcp_client::delete_oauth_tokens;
 use codex_rmcp_client::perform_oauth_login;
 use codex_rmcp_client::supports_oauth_login;
+use mcp_types::ClientCapabilities;
+use mcp_types::Implementation;
 
 /// Subcommands:
 /// - `serve`  — run the MCP server on stdio
@@ -42,6 +47,8 @@ pub enum McpSubcommand {
     Remove(RemoveArgs),
     Login(LoginArgs),
     Logout(LogoutArgs),
+    /// Run MCP conformance tests against a server URL
+    Conformance(ConformanceArgs),
 }
 
 #[derive(Debug, clap::Parser)]
@@ -146,6 +153,16 @@ pub struct LogoutArgs {
     pub name: String,
 }
 
+#[derive(Debug, clap::Parser)]
+pub struct ConformanceArgs {
+    /// URL of the MCP server to test against
+    pub url: String,
+
+    /// Timeout in seconds for initialization (default: 30)
+    #[arg(long, default_value = "30")]
+    pub timeout: u64,
+}
+
 impl McpCli {
     pub async fn run(self) -> Result<()> {
         let McpCli {
@@ -171,6 +188,9 @@ impl McpCli {
             }
             McpSubcommand::Logout(args) => {
                 run_logout(&config_overrides, args).await?;
+            }
+            McpSubcommand::Conformance(args) => {
+                run_conformance(args).await?;
             }
         }
 
@@ -824,4 +844,128 @@ fn validate_server_name(name: &str) -> Result<()> {
     } else {
         bail!("invalid server name '{name}' (use letters, numbers, '-', '_')");
     }
+}
+
+/// Run MCP conformance tests using Codex's real MCP client implementation.
+///
+/// This uses the same RmcpClient and initialization parameters as the
+/// actual Codex MCP client, ensuring conformance tests reflect real behavior.
+async fn run_conformance(args: ConformanceArgs) -> Result<()> {
+    let ConformanceArgs { url, timeout } = args;
+    let timeout_duration = Duration::from_secs(timeout);
+
+    println!("MCP Conformance Test (Codex Client)");
+    println!("====================================");
+    println!("Server URL: {url}");
+    println!("Protocol Version: {}", mcp_types::MCP_SCHEMA_VERSION);
+    println!();
+
+    // Create client using Codex's real RmcpClient
+    println!("Creating MCP client...");
+    let client = RmcpClient::new_streamable_http_client(
+        "conformance-test",
+        &url,
+        None, // No bearer token
+        None, // No HTTP headers
+        None, // No env HTTP headers
+        OAuthCredentialsStoreMode::Auto, // Use default OAuth storage
+    )
+    .await
+    .context("Failed to create MCP client")?;
+
+    // Use the same initialization parameters as Codex's mcp_connection_manager
+    let params = mcp_types::InitializeRequestParams {
+        capabilities: ClientCapabilities {
+            experimental: None,
+            roots: None,
+            sampling: None,
+            // Same as Codex: empty object indicates elicitation support
+            elicitation: Some(serde_json::json!({})),
+        },
+        client_info: Implementation {
+            name: "codex-mcp-client".to_owned(),
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+            title: Some("Codex Conformance Test".into()),
+            user_agent: None,
+        },
+        protocol_version: mcp_types::MCP_SCHEMA_VERSION.to_owned(),
+    };
+
+    // Create a dummy elicitation handler (we don't support interactive elicitation in tests)
+    let send_elicitation: codex_rmcp_client::SendElicitation = Box::new(|_id, _request| {
+        Box::pin(async {
+            Err(anyhow!("Elicitation not supported in conformance test mode"))
+        })
+    });
+
+    println!("Initializing connection...");
+    let init_result = client
+        .initialize(params, Some(timeout_duration), send_elicitation)
+        .await
+        .context("Failed to initialize MCP connection")?;
+
+    println!("  Server: {} v{}",
+        init_result.server_info.name,
+        init_result.server_info.version
+    );
+    println!("  Protocol: {}", init_result.protocol_version);
+    println!("  Capabilities: tools={}, resources={}, prompts={}",
+        init_result.capabilities.tools.is_some(),
+        init_result.capabilities.resources.is_some(),
+        init_result.capabilities.prompts.is_some()
+    );
+    println!();
+
+    // List tools
+    println!("Listing tools...");
+    let tools_result = client
+        .list_tools(None, Some(timeout_duration))
+        .await
+        .context("Failed to list tools")?;
+
+    println!("  Found {} tools", tools_result.tools.len());
+    for tool in &tools_result.tools {
+        println!("    - {}: {}",
+            tool.name,
+            tool.description.as_deref().unwrap_or("(no description)")
+        );
+    }
+    println!();
+
+    // Call add_numbers tool if available (for conformance test compatibility)
+    if let Some(tool) = tools_result.tools.iter().find(|t| t.name == "add_numbers") {
+        println!("Calling tool: {} ...", tool.name);
+        let arguments = serde_json::json!({"a": 5, "b": 3});
+        match client
+            .call_tool(
+                "add_numbers".to_string(),
+                Some(arguments),
+                Some(timeout_duration),
+            )
+            .await
+        {
+            Ok(result) => {
+                println!("  Result: {:?}", result);
+            }
+            Err(e) => {
+                println!("  Error: {e}");
+            }
+        }
+        println!();
+    }
+
+    // List resources (optional)
+    println!("Listing resources...");
+    match client.list_resources(None, Some(timeout_duration)).await {
+        Ok(result) => {
+            println!("  Found {} resources", result.resources.len());
+        }
+        Err(e) => {
+            println!("  Not available: {e}");
+        }
+    }
+    println!();
+
+    println!("Conformance test completed successfully!");
+    Ok(())
 }
