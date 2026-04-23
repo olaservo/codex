@@ -1692,6 +1692,7 @@ mod tests {
             tool_timeout_sec: None,
             enabled_tools: None,
             disabled_tools: None,
+            mcp_skills: true,
         };
         config.mcp_servers.insert("docs".to_string(), stdio_config);
 
@@ -1711,6 +1712,7 @@ mod tests {
             tool_timeout_sec: None,
             enabled_tools: None,
             disabled_tools: None,
+            mcp_skills: true,
         };
         config.mcp_servers.insert("http".to_string(), http_config);
 

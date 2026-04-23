@@ -36,6 +36,29 @@ pub(crate) async fn build_skill_injections(
     };
 
     for skill in mentioned_skills {
+        if let (Some(uri), Some(server)) =
+            (skill.uri.as_deref(), skill.server_name.as_deref())
+        {
+            // MCP skills can't be read from disk; emit a model-facing
+            // instruction naming the exact `read_mcp_resource` call so
+            // activation is deterministic rather than heuristic.
+            result.warnings.push(format!(
+                "Skill {} is served by MCP server {server}; the model will load it via read_mcp_resource({uri}).",
+                skill.name
+            ));
+            let instructions = format!(
+                "The user explicitly invoked the `{name}` skill, which is served by MCP server `{server}`. \
+                 Before acting on the user's request, call read_mcp_resource(server=\"{server}\", uri=\"{uri}\") \
+                 to load the SKILL.md body. Use the server and URI exactly as given; do not rewrite them.",
+                name = skill.name,
+            );
+            result.items.push(ResponseItem::from(SkillInstructions {
+                name: skill.name,
+                path: uri.to_string(),
+                contents: instructions,
+            }));
+            continue;
+        }
         match fs::read_to_string(&skill.path).await {
             Ok(contents) => {
                 result.items.push(ResponseItem::from(SkillInstructions {

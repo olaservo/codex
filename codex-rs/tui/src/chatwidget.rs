@@ -3749,6 +3749,8 @@ fn skills_for_cwd(cwd: &Path, skills_entries: &[SkillsListEntry]) -> Vec<SkillMe
                     short_description: skill.short_description.clone(),
                     path: skill.path.clone(),
                     scope: skill.scope,
+                    uri: skill.uri.clone(),
+                    server_name: skill.server_name.clone(),
                 })
                 .collect()
         })

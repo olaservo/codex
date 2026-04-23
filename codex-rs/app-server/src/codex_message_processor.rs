@@ -3324,6 +3324,8 @@ fn skills_to_info(
             short_description: skill.short_description.clone(),
             path: skill.path.clone(),
             scope: skill.scope.into(),
+            uri: skill.uri.clone(),
+            server_name: skill.server_name.clone(),
         })
         .collect()
 }

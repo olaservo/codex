@@ -207,6 +207,7 @@ impl MessageProcessor {
             capabilities: mcp_types::ServerCapabilities {
                 completions: None,
                 experimental: None,
+                extensions: None,
                 logging: None,
                 prompts: None,
                 resources: None,
