@@ -234,8 +234,44 @@ fn discover_skills_under_root(root: &Path, scope: SkillScope, outcome: &mut Skil
 
 fn parse_skill_file(path: &Path, scope: SkillScope) -> Result<SkillMetadata, SkillParseError> {
     let contents = fs::read_to_string(path).map_err(SkillParseError::Read)?;
+    let parsed = parse_skill_frontmatter_text_inner(&contents)?;
+    let resolved_path = normalize_path(path).unwrap_or_else(|_| path.to_path_buf());
 
-    let frontmatter = extract_frontmatter(&contents).ok_or(SkillParseError::MissingFrontmatter)?;
+    Ok(SkillMetadata {
+        name: parsed.name,
+        description: parsed.description,
+        short_description: parsed.short_description,
+        path: resolved_path,
+        scope,
+        uri: None,
+        server_name: None,
+    })
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ParsedFrontmatter {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) short_description: Option<String>,
+}
+
+/// Parses the YAML frontmatter at the top of a SKILL.md document and
+/// returns the validated name/description/short-description fields.
+/// Shared between filesystem loading and MCP-served skill loading so both
+/// paths enforce the same Agent Skills schema. Errors stringify through
+/// `Display` at the boundary — callers uniformly wrap the message into a
+/// `SkillError`, so leaking the enum across modules adds API surface
+/// without helping any caller.
+pub(crate) fn parse_skill_frontmatter_text(
+    contents: &str,
+) -> Result<ParsedFrontmatter, String> {
+    parse_skill_frontmatter_text_inner(contents).map_err(|e| e.to_string())
+}
+
+fn parse_skill_frontmatter_text_inner(
+    contents: &str,
+) -> Result<ParsedFrontmatter, SkillParseError> {
+    let frontmatter = extract_frontmatter(contents).ok_or(SkillParseError::MissingFrontmatter)?;
 
     let parsed: SkillFrontmatter =
         serde_yaml::from_str(&frontmatter).map_err(SkillParseError::InvalidYaml)?;
@@ -259,14 +295,10 @@ fn parse_skill_file(path: &Path, scope: SkillScope) -> Result<SkillMetadata, Ski
         )?;
     }
 
-    let resolved_path = normalize_path(path).unwrap_or_else(|_| path.to_path_buf());
-
-    Ok(SkillMetadata {
+    Ok(ParsedFrontmatter {
         name,
         description,
         short_description,
-        path: resolved_path,
-        scope,
     })
 }
 

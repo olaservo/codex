@@ -45,6 +45,13 @@ pub struct McpServerConfig {
     /// Explicit deny-list of tools. These tools will be removed after applying `enabled_tools`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disabled_tools: Option<Vec<String>>,
+
+    /// When `true`, Codex attempts to discover Agent Skills served by this
+    /// server via the Skills-over-MCP extension (`skill://index.json`).
+    /// Defaults to `true`. Set `mcp_skills = false` to suppress skill
+    /// discovery for a server while keeping its tools available.
+    #[serde(default = "default_mcp_skills")]
+    pub mcp_skills: bool,
 }
 
 impl<'de> Deserialize<'de> for McpServerConfig {
@@ -86,6 +93,8 @@ impl<'de> Deserialize<'de> for McpServerConfig {
             enabled_tools: Option<Vec<String>>,
             #[serde(default)]
             disabled_tools: Option<Vec<String>>,
+            #[serde(default)]
+            mcp_skills: Option<bool>,
         }
 
         let mut raw = RawMcpServerConfig::deserialize(deserializer)?;
@@ -102,6 +111,7 @@ impl<'de> Deserialize<'de> for McpServerConfig {
         let enabled = raw.enabled.unwrap_or_else(default_enabled);
         let enabled_tools = raw.enabled_tools.clone();
         let disabled_tools = raw.disabled_tools.clone();
+        let mcp_skills = raw.mcp_skills.unwrap_or_else(default_mcp_skills);
 
         fn throw_if_set<E, T>(transport: &str, field: &str, value: Option<&T>) -> Result<(), E>
         where
@@ -155,11 +165,16 @@ impl<'de> Deserialize<'de> for McpServerConfig {
             enabled,
             enabled_tools,
             disabled_tools,
+            mcp_skills,
         })
     }
 }
 
 const fn default_enabled() -> bool {
+    true
+}
+
+const fn default_mcp_skills() -> bool {
     true
 }
 
@@ -696,6 +711,20 @@ mod tests {
         assert!(cfg.enabled);
         assert!(cfg.enabled_tools.is_none());
         assert!(cfg.disabled_tools.is_none());
+        // Skills-over-MCP discovery defaults on; opt-out is per-server.
+        assert!(cfg.mcp_skills);
+    }
+
+    #[test]
+    fn mcp_skills_can_be_disabled_per_server() {
+        let cfg: McpServerConfig = toml::from_str(
+            r#"
+            command = "echo"
+            mcp_skills = false
+        "#,
+        )
+        .expect("should deserialize command config with mcp_skills");
+        assert!(!cfg.mcp_skills);
     }
 
     #[test]

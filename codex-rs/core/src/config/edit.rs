@@ -1127,6 +1127,7 @@ gpt-5 = "gpt-5.1"
                 tool_timeout_sec: None,
                 enabled_tools: Some(vec!["one".to_string(), "two".to_string()]),
                 disabled_tools: None,
+                mcp_skills: true,
             },
         );
 
@@ -1148,6 +1149,7 @@ gpt-5 = "gpt-5.1"
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: Some(vec!["forbidden".to_string()]),
+                mcp_skills: true,
             },
         );
 
@@ -1212,6 +1214,7 @@ foo = { command = "cmd" }
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
         );
 
@@ -1255,6 +1258,7 @@ foo = { command = "cmd" } # keep me
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
         );
 
@@ -1297,6 +1301,7 @@ foo = { command = "cmd", args = ["--flag"] } # keep me
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
         );
 
@@ -1340,6 +1345,7 @@ foo = { command = "cmd" }
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
         );
 

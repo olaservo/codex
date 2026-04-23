@@ -435,6 +435,7 @@ async fn mcp_tool_call_output_exceeds_limit_truncated_for_model() -> Result<()> 
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
         );
         config.tool_output_token_limit = Some(500);
@@ -527,6 +528,7 @@ async fn mcp_image_output_preserves_image_and_no_text_summary() -> Result<()> {
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
         );
     });
@@ -787,6 +789,7 @@ async fn mcp_tool_call_output_not_truncated_with_custom_limit() -> Result<()> {
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
         );
     });

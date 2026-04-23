@@ -5,6 +5,7 @@ use crate::RolloutRecorder;
 use crate::exec_policy::ExecPolicyManager;
 use crate::mcp_connection_manager::McpConnectionManager;
 use crate::models_manager::manager::ModelsManager;
+use crate::skills::SkillMetadata;
 use crate::skills::SkillsManager;
 use crate::tools::sandboxing::ApprovalStore;
 use crate::unified_exec::UnifiedExecSessionManager;
@@ -28,4 +29,9 @@ pub(crate) struct SessionServices {
     pub(crate) otel_manager: OtelManager,
     pub(crate) tool_approvals: Mutex<ApprovalStore>,
     pub(crate) skills_manager: Arc<SkillsManager>,
+    /// Skills discovered from connected MCP servers at session start.
+    /// Stored here (rather than on `SkillsManager`, which is a process-wide
+    /// singleton) so per-turn `$Mention` resolution can see them without
+    /// leaking MCP skills across sessions.
+    pub(crate) session_mcp_skills: Arc<Vec<SkillMetadata>>,
 }

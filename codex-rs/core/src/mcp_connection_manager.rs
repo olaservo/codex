@@ -804,6 +804,30 @@ async fn start_server_task(
         .and_then(|exp| exp.get(MCP_SANDBOX_STATE_CAPABILITY))
         .is_some();
 
+    // Observability for the Skills-over-MCP extension. Discovery is not
+    // gated on this per the SEP; we just log so operators can confirm the
+    // server self-advertises. Per SEP-2133 extensions negotiation the
+    // declaration lives under `capabilities.extensions`; check
+    // `capabilities.experimental` as a fallback for older servers.
+    let skill_cap = initialize_result
+        .capabilities
+        .extensions
+        .as_ref()
+        .and_then(|ext| ext.get(crate::skills::SKILLS_EXTENSION_ID))
+        .or_else(|| {
+            initialize_result
+                .capabilities
+                .experimental
+                .as_ref()
+                .and_then(|exp| exp.get(crate::skills::SKILLS_EXTENSION_ID))
+        });
+    if skill_cap.is_some() {
+        tracing::info!(
+            "skills: server `{server_name}` declares `{}` capability",
+            crate::skills::SKILLS_EXTENSION_ID
+        );
+    }
+
     let managed = ManagedClient {
         client: Arc::clone(&client),
         tools,
@@ -1118,6 +1142,7 @@ mod tests {
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
             auth_status: McpAuthStatus::Unsupported,
         };
@@ -1162,6 +1187,7 @@ mod tests {
                 tool_timeout_sec: None,
                 enabled_tools: None,
                 disabled_tools: None,
+                mcp_skills: true,
             },
             auth_status: McpAuthStatus::Unsupported,
         };

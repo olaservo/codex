@@ -1744,6 +1744,9 @@ pub enum SkillScope {
     Repo,
     System,
     Admin,
+    /// Served by a connected MCP server per the Skills-over-MCP extension
+    /// (`io.modelcontextprotocol/skills`).
+    Mcp,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, TS)]
@@ -1755,6 +1758,12 @@ pub struct SkillMetadata {
     pub short_description: Option<String>,
     pub path: PathBuf,
     pub scope: SkillScope,
+    #[ts(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uri: Option<String>,
+    #[ts(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, TS)]
