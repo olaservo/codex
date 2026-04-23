@@ -1276,6 +1276,12 @@ pub struct ServerCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub experimental: Option<serde_json::Value>,
+    /// Namespaced extensions declared by the server per SEP-2133
+    /// (Extensions). Each key is a reverse-DNS extension identifier such as
+    /// `io.modelcontextprotocol/skills`; each value is extension-defined.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub extensions: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub logging: Option<serde_json::Value>,
